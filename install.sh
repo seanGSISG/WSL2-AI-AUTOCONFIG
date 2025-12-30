@@ -213,94 +213,6 @@ ACFS_ERROR="#f38ba8"
 ACFS_MUTED="#6c7086"
 
 # ============================================================
-# Fetch commit SHA and date from GitHub API
-# This ensures we always know exactly which version is running
-# ============================================================
-export ACFS_COMMIT_SHA=""   # exported for child processes/debugging
-export ACFS_COMMIT_DATE=""  # exported for child processes/debugging
-ACFS_COMMIT_AGE=""
-
-fetch_commit_sha() {
-    # Already have it? Skip
-    if [[ -n "$ACFS_COMMIT_SHA" && "$ACFS_COMMIT_SHA" != "(unknown)" ]]; then
-        return 0
-    fi
-
-    # Need curl
-    if ! command -v curl &>/dev/null; then
-        ACFS_COMMIT_SHA="(curl not available)"
-        return 0
-    fi
-
-    # Fetch from GitHub API - get the commit SHA for the ref
-    local api_url="https://api.github.com/repos/${ACFS_REPO_OWNER}/${ACFS_REPO_NAME}/commits/${ACFS_REF}"
-    local response
-
-    if response=$(curl -sf --max-time 5 "$api_url" 2>/dev/null); then
-        # Try to use python3 for robust JSON parsing if available
-        local sha=""
-        local commit_date=""
-        
-        if command -v python3 &>/dev/null; then
-            # Python parsing - robust against JSON formatting changes
-            sha=$(echo "$response" | python3 -c "import sys, json; print(json.load(sys.stdin).get('sha', ''))" 2>/dev/null)
-            commit_date=$(echo "$response" | python3 -c "import sys, json; print(json.load(sys.stdin).get('commit', {}).get('author', {}).get('date', ''))" 2>/dev/null)
-        else
-            # Fallback: Extract SHA from JSON using grep/sed (works without jq/python)
-            # Use grep -o to handle minified JSON (puts matches on new lines)
-            sha=$(echo "$response" | grep -o '"sha":[[:space:]]*"[^"]*"' | head -n 1 | sed 's/.*"\([a-f0-9]*\)".*/\1/')
-
-            # Extract commit date (format: "2025-12-21T10:30:00Z")
-            commit_date=$(echo "$response" | grep -o '"date":[[:space:]]*"[^"]*"' | head -n 1 | sed 's/.*"\([^"]*\)".*/\1/')
-        fi
-
-        if [[ -n "$sha" && ${#sha} -ge 7 ]]; then
-            ACFS_COMMIT_SHA="${sha:0:12}"
-            # shellcheck disable=SC2034  # Used by scripts/lib/ubuntu_upgrade.sh to pin resume scripts to a specific commit.
-            [[ ${#sha} -ge 40 ]] && ACFS_COMMIT_SHA_FULL="$sha"
-        fi
-
-        if [[ -n "$commit_date" ]]; then
-            ACFS_COMMIT_DATE="$commit_date"
-            # Calculate age
-            local now commit_ts age_seconds
-            now=$(date +%s 2>/dev/null || echo 0)
-            # Parse ISO 8601 date - handle both GNU and BSD date
-            if date -d "$commit_date" +%s &>/dev/null; then
-                # GNU date
-                commit_ts=$(date -d "$commit_date" +%s 2>/dev/null || echo 0)
-            else
-                # BSD date - try simpler parsing
-                commit_ts=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$commit_date" +%s 2>/dev/null || echo 0)
-            fi
-
-            if [[ "$now" -gt 0 && "$commit_ts" -gt 0 ]]; then
-                age_seconds=$((now - commit_ts))
-                # Handle negative age (clock skew / future commit)
-                if [[ $age_seconds -lt 0 ]]; then
-                    ACFS_COMMIT_AGE="just now"
-                elif [[ $age_seconds -lt 60 ]]; then
-                    ACFS_COMMIT_AGE="${age_seconds}s ago"
-                elif [[ $age_seconds -lt 3600 ]]; then
-                    ACFS_COMMIT_AGE="$((age_seconds / 60))m ago"
-                elif [[ $age_seconds -lt 86400 ]]; then
-                    ACFS_COMMIT_AGE="$((age_seconds / 3600))h ago"
-                else
-                    ACFS_COMMIT_AGE="$((age_seconds / 86400))d ago"
-                fi
-            fi
-        fi
-
-        if [[ -n "$ACFS_COMMIT_SHA" ]]; then
-            return 0
-        fi
-    fi
-
-    # Fallback
-    ACFS_COMMIT_SHA="(unknown)"
-}
-
-# ============================================================
 # Install gum FIRST for beautiful UI from the start
 # ============================================================
 install_gum_early() {
@@ -422,21 +334,8 @@ print_banner() {
     local version_line
     version_line=$(printf "║%*s%s%*s║" "$padding" "" "$version_text" "$((63 - padding - ${#version_text}))" "")
 
-    # Build commit info line
-    local commit_text=""
-    if [[ -n "$ACFS_COMMIT_SHA" && "$ACFS_COMMIT_SHA" != "(unknown)" ]]; then
-        commit_text="Commit: ${ACFS_COMMIT_SHA}"
-        if [[ -n "$ACFS_COMMIT_AGE" ]]; then
-            commit_text="${commit_text} (${ACFS_COMMIT_AGE})"
-        fi
-    fi
-    local commit_padding=$(( (63 - ${#commit_text}) / 2 ))
-    local commit_line
-    if [[ -n "$commit_text" ]]; then
-        commit_line=$(printf "║%*s%s%*s║" "$commit_padding" "" "$commit_text" "$((63 - commit_padding - ${#commit_text}))" "")
-    else
-        commit_line="║                                                               ║"
-    fi
+    # Empty line for spacing
+    local commit_line="║                                                               ║"
 
     local banner="
 ╔═══════════════════════════════════════════════════════════════╗
@@ -3833,15 +3732,6 @@ main() {
     fi
 
     if [[ -z "${SCRIPT_DIR:-}" ]]; then
-        # Resolve ACFS_REF to a specific commit SHA early to prevent mixed-ref installs.
-        # Without this, we could download a tarball for one commit and later fetch commit metadata
-        # (or resume scripts) from a newer commit if the branch/tag moves mid-install.
-        fetch_commit_sha
-        if [[ -n "${ACFS_COMMIT_SHA_FULL:-}" ]]; then
-            ACFS_REF="$ACFS_COMMIT_SHA_FULL"
-            ACFS_RAW="https://raw.githubusercontent.com/${ACFS_REPO_OWNER}/${ACFS_REPO_NAME}/${ACFS_REF}"
-            export ACFS_REF ACFS_RAW
-        fi
         bootstrap_repo_archive
     fi
 
@@ -3950,9 +3840,6 @@ main() {
 
     # Install gum FIRST so the entire script looks amazing
     install_gum_early
-
-    # Fetch commit SHA for version display
-    fetch_commit_sha
 
     # Print beautiful ASCII banner (now with gum if available!)
     print_banner
