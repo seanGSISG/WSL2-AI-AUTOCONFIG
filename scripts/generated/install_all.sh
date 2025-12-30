@@ -66,32 +66,22 @@ source "$ACFS_GENERATED_SCRIPT_DIR/install_users.sh"
 source "$ACFS_GENERATED_SCRIPT_DIR/install_filesystem.sh"
 source "$ACFS_GENERATED_SCRIPT_DIR/install_shell.sh"
 source "$ACFS_GENERATED_SCRIPT_DIR/install_cli.sh"
-source "$ACFS_GENERATED_SCRIPT_DIR/install_network.sh"
 source "$ACFS_GENERATED_SCRIPT_DIR/install_lang.sh"
 source "$ACFS_GENERATED_SCRIPT_DIR/install_tools.sh"
 source "$ACFS_GENERATED_SCRIPT_DIR/install_agents.sh"
-source "$ACFS_GENERATED_SCRIPT_DIR/install_db.sh"
-source "$ACFS_GENERATED_SCRIPT_DIR/install_cloud.sh"
-source "$ACFS_GENERATED_SCRIPT_DIR/install_stack.sh"
-source "$ACFS_GENERATED_SCRIPT_DIR/install_acfs.sh"
 
 # Install all modules in order
 install_all() {
-    log_section "ACFS Full Installation"
+    log_section "WSL2-AI-AUTOCONFIG Full Installation"
 
     install_base
     install_users
     install_filesystem
     install_shell
     install_cli
-    install_network
     install_lang
     install_tools
     install_agents
-    install_db
-    install_cloud
-    install_stack
-    install_acfs
 
     log_success "All modules installed!"
 }

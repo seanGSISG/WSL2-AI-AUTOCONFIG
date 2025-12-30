@@ -9,11 +9,10 @@
 # Removed: cloud tools, VPS/SSH features.
 #
 # Usage:
-#   curl -fsSL "https://raw.githubusercontent.com/seanGSISG/WSL2-AI-AUTOCONFIG/main/install.sh" | bash -s -- --yes --mode vibe
+#   curl -fsSL "https://raw.githubusercontent.com/seanGSISG/WSL2-AI-AUTOCONFIG/main/install.sh" | sudo bash -s -- --yes
 #
 # Options:
 #   --yes         Skip all prompts, use defaults
-#   --mode vibe   Enable passwordless sudo, full agent permissions
 #   --dry-run     Print what would be done without changing system
 #   --print       Print upstream scripts/versions that will be run
 #   --resume          Resume from checkpoint (default when state exists)
@@ -51,7 +50,10 @@ export WSL2AIAC_RAW WSL2AIAC_VERSION
 # Keep ACFS_* as aliases for compatibility with sourced scripts
 ACFS_VERSION="$WSL2AIAC_VERSION"
 ACFS_RAW="$WSL2AIAC_RAW"
-export ACFS_RAW ACFS_VERSION
+ACFS_REF="$WSL2AIAC_REF"
+ACFS_REPO_OWNER="$WSL2AIAC_REPO_OWNER"
+ACFS_REPO_NAME="$WSL2AIAC_REPO_NAME"
+export ACFS_RAW ACFS_VERSION ACFS_REF ACFS_REPO_OWNER ACFS_REPO_NAME
 WSL2AIAC_COMMIT_SHA=""       # Short SHA for display (12 chars)
 WSL2AIAC_COMMIT_SHA_FULL=""  # Full SHA for pinning resume scripts (40 chars)
 
@@ -448,9 +450,7 @@ cleanup() {
         log_error ""
         log_error "To debug:"
         log_error "  1. Check the log: cat $ACFS_LOG_DIR/install.log"
-        log_error "  2. If installed, run: acfs doctor (try as $TARGET_USER)"
-        log_error "     (If you ran the installer as root: sudo -u $TARGET_USER -i bash -lc 'acfs doctor')"
-        log_error "  3. Re-run this installer (it's safe to run multiple times)"
+        log_error "  2. Re-run this installer (it's safe to run multiple times)"
         log_error ""
     fi
 }
@@ -472,31 +472,6 @@ parse_args() {
                 ;;
             --print)
                 PRINT_MODE=true
-                shift
-                ;;
-            --mode)
-                if [[ -z "${2:-}" ]]; then
-                    log_fatal "--mode requires a value (e.g., --mode vibe)"
-                fi
-                MODE="$2"
-                case "$MODE" in
-                    vibe|safe) ;;
-                    *)
-                        log_fatal "Invalid --mode '$MODE' (expected: vibe or safe)"
-                        ;;
-                esac
-                shift 2
-                ;;
-            --skip-postgres)
-                SKIP_POSTGRES=true
-                shift
-                ;;
-            --skip-vault)
-                SKIP_VAULT=true
-                shift
-                ;;
-            --skip-cloud)
-                SKIP_CLOUD=true
                 shift
                 ;;
             --resume)
@@ -750,14 +725,9 @@ source_generated_installers() {
         "install_filesystem.sh"
         "install_shell.sh"
         "install_cli.sh"
-        "install_network.sh"
         "install_lang.sh"
         "install_tools.sh"
         "install_agents.sh"
-        "install_db.sh"
-        "install_cloud.sh"
-        "install_stack.sh"
-        "install_acfs.sh"
     )
 
     for script in "${scripts[@]}"; do
@@ -2741,13 +2711,13 @@ install_languages() {
 # ============================================================
 install_agents_phase() {
     set_phase "agents" "Coding Agents"
-    log_step "6/8" "Installing coding agents..."
+    log_step "6/7" "Installing coding agents..."
 
     if acfs_use_generated_category "agents"; then
         log_detail "Using generated installers for agents (phase 7)"
         acfs_run_generated_category_phase "agents" "7" || return 1
 
-        # CI/doctor expectations: ensure `claude` resolves to ~/.local/bin/claude.
+        # Ensure `claude` resolves to ~/.local/bin/claude.
         # The native installer can choose non-standard paths, and bun installs land in ~/.bun/bin.
         local claude_bin_local="$TARGET_HOME/.local/bin/claude"
         if [[ ! -x "$claude_bin_local" ]]; then
@@ -2837,8 +2807,8 @@ install_agents_phase() {
         fi
     fi
 
-    # Prefer ~/.local/bin for Claude to avoid PATH conflict warnings in acfs doctor.
-    # (If Claude was installed via bun, link it into ~/.local/bin which is earlier in PATH.)
+    # Prefer ~/.local/bin for Claude (earlier in PATH).
+    # (If Claude was installed via bun, link it into ~/.local/bin.)
     if [[ ! -x "$claude_bin_local" && -x "$claude_bin_bun" ]]; then
         run_as_target mkdir -p "$TARGET_HOME/.local/bin" 2>/dev/null || true
         try_step "Linking Claude Code into ~/.local/bin" run_as_target ln -sf "$claude_bin_bun" "$claude_bin_local" || true
@@ -2882,347 +2852,11 @@ install_agents_phase() {
 }
 
 # ============================================================
-# Phase 7: Cloud & database tools
-# ============================================================
-install_cloud_db_legacy_db() {
-    local codename="$1"
-
-    # PostgreSQL 18 (via PGDG)
-    if [[ "$SKIP_POSTGRES" == "true" ]]; then
-        log_detail "Skipping PostgreSQL (--skip-postgres)"
-    elif command_exists psql; then
-        log_detail "PostgreSQL already installed ($(psql --version 2>/dev/null | head -1 || echo 'psql'))"
-    else
-        # PGDG may lag behind new Ubuntu codenames (e.g. 25.10) - fall back to noble (24.04 LTS) when needed.
-        local pgdg_codename="$codename"
-        if command_exists curl && ! curl -sfI "https://apt.postgresql.org/pub/repos/apt/dists/${codename}-pgdg/Release" >/dev/null 2>&1; then
-            pgdg_codename="noble"
-            log_detail "PGDG repo unavailable for $codename, using $pgdg_codename"
-        fi
-
-        log_detail "Installing PostgreSQL 18 (PGDG repo, codename=$pgdg_codename)"
-        try_step "Creating apt keyrings for PostgreSQL" $SUDO mkdir -p /etc/apt/keyrings || true
-
-        if ! try_step_eval "Adding PostgreSQL apt key" "set -o pipefail; if curl --help all 2>/dev/null | grep -q -- '--proto'; then curl --proto '=https' --proto-redir '=https' -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc; else curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc; fi | $SUDO gpg --batch --yes --dearmor -o /etc/apt/keyrings/postgresql.gpg 2>/dev/null"; then
-            log_warn "PostgreSQL: failed to install signing key (skipping)"
-        else
-            try_step_eval "Adding PostgreSQL apt repo" "echo 'deb [signed-by=/etc/apt/keyrings/postgresql.gpg] https://apt.postgresql.org/pub/repos/apt ${pgdg_codename}-pgdg main' | $SUDO tee /etc/apt/sources.list.d/pgdg.list > /dev/null" || true
-
-            try_step "Updating apt cache for PostgreSQL" $SUDO apt-get update -y || log_warn "PostgreSQL: apt-get update failed (continuing)"
-
-            if try_step "Installing PostgreSQL 18" $SUDO apt-get install -y postgresql-18 postgresql-client-18; then
-                log_success "PostgreSQL 18 installed"
-
-                # Best-effort service start (GitHub Actions containers may not have systemd)
-                if command_exists systemctl && [[ -d /run/systemd/system ]]; then
-                    try_step "Enabling PostgreSQL service" $SUDO systemctl enable postgresql || true
-                    try_step "Starting PostgreSQL service" $SUDO systemctl start postgresql || true
-                elif command_exists pg_ctlcluster; then
-                    # Start directly without systemd to avoid noisy `systemctl` errors in containers.
-                    try_step "Starting PostgreSQL cluster" $SUDO pg_ctlcluster 18 main start || true
-                elif command_exists service; then
-                    try_step "Starting PostgreSQL service (service)" $SUDO service postgresql start || true
-                fi
-
-                # Best-effort role + db for target user
-                if command_exists runuser; then
-                    $SUDO runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$TARGET_USER'" | grep -q 1 || \
-                        $SUDO runuser -u postgres -- createuser -s "$TARGET_USER" 2>/dev/null || true
-                    $SUDO runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_database WHERE datname='$TARGET_USER'" | grep -q 1 || \
-                        $SUDO runuser -u postgres -- createdb "$TARGET_USER" 2>/dev/null || true
-                elif command_exists sudo; then
-                    sudo -u postgres -H psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$TARGET_USER'" | grep -q 1 || \
-                        sudo -u postgres -H createuser -s "$TARGET_USER" 2>/dev/null || true
-                    sudo -u postgres -H psql -tAc "SELECT 1 FROM pg_database WHERE datname='$TARGET_USER'" | grep -q 1 || \
-                        sudo -u postgres -H createdb "$TARGET_USER" 2>/dev/null || true
-                fi
-            else
-                log_warn "PostgreSQL: installation failed (optional)"
-            fi
-        fi
-    fi
-}
-
-install_cloud_db_legacy_tools() {
-    local codename="$1"
-
-    # Vault (HashiCorp apt repo)
-    if [[ "$SKIP_VAULT" == "true" ]]; then
-        log_detail "Skipping Vault (--skip-vault)"
-    elif command_exists vault; then
-        log_detail "Vault already installed ($(vault --version 2>/dev/null | head -1 || echo 'vault'))"
-    else
-        # HashiCorp doesn't always have packages for newest Ubuntu versions.
-        # Check if the current codename is supported, otherwise fall back to noble (24.04 LTS).
-        local vault_codename="$codename"
-        if ! curl -sfI "https://apt.releases.hashicorp.com/dists/${codename}/main/binary-amd64/Packages" >/dev/null 2>&1; then
-            vault_codename="noble"
-            log_detail "HashiCorp repo unavailable for $codename, using $vault_codename"
-        fi
-
-        log_detail "Installing Vault (HashiCorp repo, codename=$vault_codename)"
-        try_step "Creating apt keyrings for Vault" $SUDO mkdir -p /etc/apt/keyrings || true
-
-        if ! try_step_eval "Adding HashiCorp apt key" "set -o pipefail; if curl --help all 2>/dev/null | grep -q -- '--proto'; then curl --proto '=https' --proto-redir '=https' -fsSL https://apt.releases.hashicorp.com/gpg; else curl -fsSL https://apt.releases.hashicorp.com/gpg; fi | $SUDO gpg --batch --yes --dearmor -o /etc/apt/keyrings/hashicorp.gpg 2>/dev/null"; then
-            log_warn "Vault: failed to install signing key (skipping)"
-        else
-            try_step_eval "Adding HashiCorp apt repo" "echo 'deb [signed-by=/etc/apt/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com ${vault_codename} main' | $SUDO tee /etc/apt/sources.list.d/hashicorp.list > /dev/null" || true
-
-            try_step "Updating apt cache for Vault" $SUDO apt-get update -y || log_warn "Vault: apt-get update failed (continuing)"
-            if try_step "Installing Vault" $SUDO apt-get install -y vault; then
-                log_success "Vault installed"
-            else
-                log_warn "Vault: installation failed (optional)"
-            fi
-        fi
-    fi
-}
-
-install_supabase_cli_release() {
-    local arch=""
-    case "$(uname -m)" in
-        x86_64) arch="amd64" ;;
-        aarch64|arm64) arch="arm64" ;;
-        *)
-            log_error "Supabase CLI: unsupported architecture ($(uname -m))"
-            return 1
-            ;;
-    esac
-
-    local release_url=""
-    release_url="$(acfs_curl -o /dev/null -w '%{url_effective}\n' "https://github.com/supabase/cli/releases/latest" 2>/dev/null | tail -n1)" || true
-    local tag="${release_url##*/}"
-    if [[ -z "$tag" ]] || [[ "$tag" != v* ]]; then
-        log_error "Supabase CLI: failed to resolve latest release tag"
-        return 1
-    fi
-
-    local version="${tag#v}"
-    local base_url="https://github.com/supabase/cli/releases/download/${tag}"
-    local tarball="supabase_linux_${arch}.tar.gz"
-    local checksums="supabase_${version}_checksums.txt"
-
-    local tmp_dir=""
-    local tmp_tgz=""
-    local tmp_checksums=""
-    if command -v mktemp &>/dev/null; then
-        tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/acfs-supabase.XXXXXX" 2>/dev/null)" || tmp_dir=""
-        tmp_tgz="$(mktemp "${TMPDIR:-/tmp}/acfs-supabase.tgz.XXXXXX" 2>/dev/null)" || tmp_tgz=""
-        tmp_checksums="$(mktemp "${TMPDIR:-/tmp}/acfs-supabase.sha.XXXXXX" 2>/dev/null)" || tmp_checksums=""
-    fi
-
-    if [[ -z "$tmp_dir" ]] || [[ -z "$tmp_tgz" ]] || [[ -z "$tmp_checksums" ]]; then
-        log_error "Supabase CLI: failed to create temp files"
-        return 1
-    fi
-
-    if ! acfs_curl -o "$tmp_tgz" "${base_url}/${tarball}" 2>/dev/null; then
-        log_error "Supabase CLI: failed to download ${tarball}"
-        return 1
-    fi
-    if ! acfs_curl -o "$tmp_checksums" "${base_url}/${checksums}" 2>/dev/null; then
-        log_error "Supabase CLI: failed to download checksums"
-        return 1
-    fi
-
-    local expected_sha=""
-    expected_sha="$(grep -E " ${tarball}\$" "$tmp_checksums" 2>/dev/null | awk '{print $1}' | head -n1)" || true
-    if [[ -z "$expected_sha" ]]; then
-        log_error "Supabase CLI: checksum entry not found for ${tarball}"
-        return 1
-    fi
-
-    local actual_sha=""
-    actual_sha="$(acfs_calculate_file_sha256 "$tmp_tgz" 2>/dev/null)" || actual_sha=""
-    if [[ -z "$actual_sha" ]] || [[ "$actual_sha" != "$expected_sha" ]]; then
-        log_error "Supabase CLI: checksum mismatch"
-        log_error "  Expected: $expected_sha"
-        log_error "  Actual:   ${actual_sha:-<missing>}"
-        return 1
-    fi
-
-    # Extract only the binary if possible (keeps tmp dir clean).
-    if ! tar -xzf "$tmp_tgz" -C "$tmp_dir" supabase 2>/dev/null; then
-        tar -xzf "$tmp_tgz" -C "$tmp_dir" 2>/dev/null || {
-            log_error "Supabase CLI: failed to extract tarball"
-            return 1
-        }
-    fi
-
-    local extracted_bin="$tmp_dir/supabase"
-    if [[ ! -f "$extracted_bin" ]]; then
-        extracted_bin="$(find "$tmp_dir" -maxdepth 2 -type f -name supabase -print -quit 2>/dev/null || true)"
-    fi
-    if [[ -z "$extracted_bin" ]] || [[ ! -f "$extracted_bin" ]]; then
-        log_error "Supabase CLI: binary not found after extract"
-        return 1
-    fi
-
-    chmod 755 "$tmp_dir" 2>/dev/null || true
-    chmod 755 "$extracted_bin" 2>/dev/null || true
-
-    run_as_target mkdir -p "$TARGET_HOME/.local/bin" 2>/dev/null || true
-    if ! run_as_target install -m 0755 "$extracted_bin" "$TARGET_HOME/.local/bin/supabase"; then
-        log_error "Supabase CLI: failed to install into ~/.local/bin"
-        return 1
-    fi
-    if ! run_as_target "$TARGET_HOME/.local/bin/supabase" --version >/dev/null 2>&1; then
-        log_error "Supabase CLI: installed but failed to run"
-        return 1
-    fi
-
-    # Best-effort cleanup
-    rm -f "$tmp_tgz" "$tmp_checksums" "$extracted_bin" 2>/dev/null || true
-    rmdir "$tmp_dir" 2>/dev/null || true
-
-    return 0
-}
-
-install_cloud_db_legacy_cloud() {
-    # Cloud CLIs (bun global installs)
-    if [[ "$SKIP_CLOUD" == "true" ]]; then
-        log_detail "Skipping cloud CLIs (--skip-cloud)"
-    else
-        local bun_bin="$TARGET_HOME/.bun/bin/bun"
-        if [[ ! -x "$bun_bin" ]]; then
-            log_warn "Cloud CLIs: bun not found at $bun_bin (skipping)"
-        else
-            local cli
-            for cli in wrangler supabase vercel; do
-                if [[ "$cli" == "supabase" ]]; then
-                    if [[ -x "$TARGET_HOME/.local/bin/supabase" ]] || [[ -x "$TARGET_HOME/.bun/bin/supabase" ]]; then
-                        log_detail "supabase already installed"
-                        continue
-                    fi
-
-                    log_detail "Installing supabase (direct binary)"
-                    if try_step "Installing supabase" install_supabase_cli_release; then
-                        log_success "supabase installed"
-                    else
-                        log_warn "supabase installation failed (optional)"
-                    fi
-                    continue
-                fi
-
-                if [[ -x "$TARGET_HOME/.bun/bin/$cli" ]]; then
-                    log_detail "$cli already installed"
-                    continue
-                fi
-
-                log_detail "Installing $cli via bun"
-                if try_step "Installing $cli via bun" run_as_target "$bun_bin" install -g --trust "${cli}@latest"; then
-                    if [[ -x "$TARGET_HOME/.bun/bin/$cli" ]]; then
-                        log_success "$cli installed"
-                    else
-                        log_warn "$cli: install finished but binary not found"
-                    fi
-                else
-                    log_warn "$cli installation failed (optional)"
-                fi
-            done
-        fi
-    fi
-}
-
-install_cloud_db_legacy() {
-    # Cloud CLIs (bun global installs)
-    if [[ "$SKIP_CLOUD" == "true" ]]; then
-        log_detail "Skipping cloud CLIs (--skip-cloud)"
-    else
-        local bun_bin="$TARGET_HOME/.bun/bin/bun"
-        if [[ ! -x "$bun_bin" ]]; then
-            log_warn "Cloud CLIs: bun not found at $bun_bin (skipping)"
-        else
-            local cli
-            for cli in wrangler supabase vercel; do
-                if [[ "$cli" == "supabase" ]]; then
-                    if [[ -x "$TARGET_HOME/.local/bin/supabase" ]] || [[ -x "$TARGET_HOME/.bun/bin/supabase" ]]; then
-                        log_detail "supabase already installed"
-                        continue
-                    fi
-
-                    log_detail "Installing supabase (direct binary)"
-                    if try_step "Installing supabase" install_supabase_cli_release; then
-                        log_success "supabase installed"
-                    else
-                        log_warn "supabase installation failed (optional)"
-                    fi
-                    continue
-                fi
-
-                if [[ -x "$TARGET_HOME/.bun/bin/$cli" ]]; then
-                    log_detail "$cli already installed"
-                    continue
-                fi
-
-                log_detail "Installing $cli via bun"
-                if try_step "Installing $cli via bun" run_as_target "$bun_bin" install -g --trust "${cli}@latest"; then
-                    if [[ -x "$TARGET_HOME/.bun/bin/$cli" ]]; then
-                        log_success "$cli installed"
-                    else
-                        log_warn "$cli: install finished but binary not found"
-                    fi
-                else
-                    log_warn "$cli installation failed (optional)"
-                fi
-            done
-        fi
-    fi
-}
-
-install_cloud_db() {
-    set_phase "cloud_db" "Cloud & Database Tools"
-    log_step "7/8" "Installing cloud & database tools..."
-
-    local codename="noble"
-    if [[ -f /etc/os-release ]]; then
-        # shellcheck disable=SC1091
-        source /etc/os-release
-        codename="${VERSION_CODENAME:-noble}"
-    fi
-
-    local ran_any=false
-
-    if acfs_use_generated_category "db"; then
-        log_detail "Using generated installers for db (phase 8)"
-        acfs_run_generated_category_phase "db" "8" || return 1
-        ran_any=true
-    else
-        install_cloud_db_legacy_db "$codename" || return 1
-        ran_any=true
-    fi
-
-    if acfs_use_generated_category "tools"; then
-        log_detail "Using generated installers for tools (phase 8)"
-        acfs_run_generated_category_phase "tools" "8" || return 1
-        ran_any=true
-    else
-        install_cloud_db_legacy_tools "$codename" || return 1
-        ran_any=true
-    fi
-
-    if acfs_use_generated_category "cloud"; then
-        log_detail "Using generated installers for cloud (phase 8)"
-        acfs_run_generated_category_phase "cloud" "8" || return 1
-        ran_any=true
-    else
-        install_cloud_db_legacy_cloud || return 1
-        ran_any=true
-    fi
-
-    if [[ "$ran_any" != "true" ]]; then
-        log_warn "No cloud/db/tools modules selected"
-    fi
-
-    log_success "Cloud & database tools phase complete"
-}
-
-# ============================================================
-# Phase 8: Final wiring
+# Phase 7: Final wiring (cloud/db removed)
 # ============================================================
 finalize() {
     set_phase "finalize" "Final Wiring"
-    log_step "8/8" "Finalizing installation..."
+    log_step "7/7" "Finalizing installation..."
 
     if acfs_use_generated_category "acfs"; then
         log_detail "Using generated installers for acfs (phase 10)"
@@ -3241,34 +2875,9 @@ finalize() {
         try_step "Linking tmux.conf" run_as_target ln -sf "$ACFS_HOME/tmux/tmux.conf" "$TARGET_HOME/.tmux.conf" || return 1
     fi
 
-    # Install onboard lessons + command
-    log_detail "Installing onboard lessons"
-    try_step "Creating onboard lessons directory" $SUDO mkdir -p "$ACFS_HOME/onboard/lessons" || return 1
-    local lesson_files=(
-        "00_welcome.md"
-        "01_linux_basics.md"
-        "02_ssh_basics.md"
-        "03_tmux_basics.md"
-        "04_agents_login.md"
-        "05_ntm_core.md"
-        "06_ntm_command_palette.md"
-        "07_flywheel_loop.md"
-        "08_keeping_updated.md"
-    )
-    local lesson
-    for lesson in "${lesson_files[@]}"; do
-        try_step "Installing onboard lesson: $lesson" install_asset "acfs/onboard/lessons/$lesson" "$ACFS_HOME/onboard/lessons/$lesson" || return 1
-    done
-
-    log_detail "Installing onboard command"
-    try_step "Installing onboard script" install_asset "packages/onboard/onboard.sh" "$ACFS_HOME/onboard/onboard.sh" || return 1
-    try_step "Setting onboard permissions" $SUDO chmod 755 "$ACFS_HOME/onboard/onboard.sh" || return 1
-    try_step "Setting onboard ownership" acfs_chown_tree "$TARGET_USER:$TARGET_USER" "$ACFS_HOME/onboard" || return 1
-
     try_step "Creating .local/bin directory" run_as_target mkdir -p "$TARGET_HOME/.local/bin" || return 1
-    try_step "Linking onboard command" run_as_target ln -sf "$ACFS_HOME/onboard/onboard.sh" "$TARGET_HOME/.local/bin/onboard" || return 1
 
-    # Install acfs scripts (for acfs CLI subcommands)
+    # Install acfs scripts
     log_detail "Installing acfs scripts"
     try_step "Creating ACFS scripts directory" $SUDO mkdir -p "$ACFS_HOME/scripts/lib" || return 1
     
@@ -3280,19 +2889,6 @@ finalize() {
     try_step "Installing logging.sh" install_asset "scripts/lib/logging.sh" "$ACFS_HOME/scripts/lib/logging.sh" || return 1
     try_step "Installing gum_ui.sh" install_asset "scripts/lib/gum_ui.sh" "$ACFS_HOME/scripts/lib/gum_ui.sh" || return 1
     try_step "Installing security.sh" install_asset "scripts/lib/security.sh" "$ACFS_HOME/scripts/lib/security.sh" || return 1
-    try_step "Installing doctor.sh" install_asset "scripts/lib/doctor.sh" "$ACFS_HOME/scripts/lib/doctor.sh" || return 1
-    try_step "Installing update.sh" install_asset "scripts/lib/update.sh" "$ACFS_HOME/scripts/lib/update.sh" || return 1
-    try_step "Installing session.sh" install_asset "scripts/lib/session.sh" "$ACFS_HOME/scripts/lib/session.sh" || return 1
-    try_step "Installing continue.sh" install_asset "scripts/lib/continue.sh" "$ACFS_HOME/scripts/lib/continue.sh" || return 1
-    try_step "Installing info.sh" install_asset "scripts/lib/info.sh" "$ACFS_HOME/scripts/lib/info.sh" || return 1
-    try_step "Installing cheatsheet.sh" install_asset "scripts/lib/cheatsheet.sh" "$ACFS_HOME/scripts/lib/cheatsheet.sh" || return 1
-    try_step "Installing dashboard.sh" install_asset "scripts/lib/dashboard.sh" "$ACFS_HOME/scripts/lib/dashboard.sh" || return 1
-
-    # Install acfs-update wrapper command
-    try_step "Installing acfs-update" install_asset "scripts/acfs-update" "$ACFS_HOME/bin/acfs-update" || return 1
-    try_step "Setting acfs-update permissions" $SUDO chmod 755 "$ACFS_HOME/bin/acfs-update" || return 1
-    try_step "Setting acfs-update ownership" $SUDO chown "$TARGET_USER:$TARGET_USER" "$ACFS_HOME/bin/acfs-update" || return 1
-    try_step "Linking acfs-update command" run_as_target ln -sf "$ACFS_HOME/bin/acfs-update" "$TARGET_HOME/.local/bin/acfs-update" || return 1
 
     # Install services-setup wizard
     try_step "Installing services-setup.sh" install_asset "scripts/services-setup.sh" "$ACFS_HOME/scripts/services-setup.sh" || return 1
@@ -3300,21 +2896,10 @@ finalize() {
     try_step "Setting lib scripts permissions" $SUDO chmod 755 "$ACFS_HOME/scripts/lib/"*.sh || return 1
     try_step "Setting scripts ownership" acfs_chown_tree "$TARGET_USER:$TARGET_USER" "$ACFS_HOME/scripts" || return 1
 
-    # Install checksums + version metadata so `acfs update --stack` can verify upstream scripts.
+    # Install checksums + version metadata for verification.
     try_step "Installing checksums.yaml" install_asset "checksums.yaml" "$ACFS_HOME/checksums.yaml" || return 1
     try_step "Installing VERSION" install_asset "VERSION" "$ACFS_HOME/VERSION" || return 1
     try_step "Setting metadata ownership" $SUDO chown "$TARGET_USER:$TARGET_USER" "$ACFS_HOME/checksums.yaml" "$ACFS_HOME/VERSION" || true
-
-    # Legacy: Install doctor as acfs binary (for backwards compat)
-    try_step "Installing acfs CLI" install_asset "scripts/lib/doctor.sh" "$ACFS_HOME/bin/acfs" || return 1
-    try_step "Setting acfs permissions" $SUDO chmod 755 "$ACFS_HOME/bin/acfs" || return 1
-    try_step "Setting acfs ownership" $SUDO chown "$TARGET_USER:$TARGET_USER" "$ACFS_HOME/bin/acfs" || return 1
-    try_step "Linking acfs command" run_as_target ln -sf "$ACFS_HOME/bin/acfs" "$TARGET_HOME/.local/bin/acfs" || return 1
-
-    # Install global acfs wrapper (works for root and all users)
-    # This wrapper finds the target user from state and runs acfs as that user
-    try_step "Installing global acfs wrapper" install_asset "scripts/acfs-global" "/usr/local/bin/acfs" || return 1
-    try_step "Setting global acfs permissions" $SUDO chmod 755 "/usr/local/bin/acfs" || return 1
 
     # Install Claude destructive-command guard hook automatically.
     #
@@ -3364,7 +2949,7 @@ _smoke_run_as_target() {
 }
 
 run_smoke_test() {
-    local critical_total=8
+    local critical_total=6
     local critical_passed=0
     local critical_failed=0
     local warnings=0
@@ -3394,28 +2979,14 @@ run_smoke_test() {
         ((critical_failed += 1))
     fi
 
-    # 3) Sudo configuration
-    # - vibe mode: passwordless sudo is required
-    # - safe mode: sudo must exist, but may require a password
-    if [[ "$MODE" == "vibe" ]]; then
-        if _smoke_run_as_target "sudo -n true" &>/dev/null; then
-            echo "✅ Sudo: passwordless (vibe mode)" >&2
-            ((critical_passed += 1))
-        else
-            echo "✖ Sudo: passwordless (vibe mode)" >&2
-            echo "    Fix: re-run installer with --mode vibe (or configure NOPASSWD for $TARGET_USER)" >&2
-            ((critical_failed += 1))
-        fi
+    # 3) Sudo configuration - passwordless sudo is required
+    if _smoke_run_as_target "sudo -n true" &>/dev/null; then
+        echo "✅ Sudo: passwordless" >&2
+        ((critical_passed += 1))
     else
-        if _smoke_run_as_target "command -v sudo >/dev/null" &>/dev/null && \
-            _smoke_run_as_target "id -nG | grep -qw sudo" &>/dev/null; then
-            echo "✅ Sudo: available (safe mode)" >&2
-            ((critical_passed += 1))
-        else
-            echo "✖ Sudo: available (safe mode)" >&2
-            echo "    Fix: ensure sudo is installed and $TARGET_USER is in the sudo group" >&2
-            ((critical_failed += 1))
-        fi
+        echo "✖ Sudo: passwordless" >&2
+        echo "    Fix: re-run installer (or configure NOPASSWD for $TARGET_USER)" >&2
+        ((critical_failed += 1))
     fi
 
     # 4) /data/projects exists
@@ -3455,94 +3026,6 @@ run_smoke_test() {
         echo "✖ Agents: missing ${missing_agents[*]}" >&2
         echo "    Fix: re-run installer (phase 6) to install agent CLIs" >&2
         ((critical_failed += 1))
-    fi
-
-    # 7) ntm command works
-    if _smoke_run_as_target "command -v ntm >/dev/null && ntm --help >/dev/null 2>&1"; then
-        echo "✅ NTM: working" >&2
-        ((critical_passed += 1))
-    else
-        echo "✖ NTM: not working" >&2
-        echo "    Fix: re-run installer (phase 8) and check $ACFS_LOG_DIR/install.log" >&2
-        ((critical_failed += 1))
-    fi
-
-    # 8) onboard command exists
-    if [[ -x "$TARGET_HOME/.local/bin/onboard" ]]; then
-        echo "✅ Onboard: installed" >&2
-        ((critical_passed += 1))
-    else
-        echo "✖ Onboard: missing" >&2
-        echo "    Fix: re-run installer (phase 9) or install onboard to $TARGET_HOME/.local/bin/onboard" >&2
-        ((critical_failed += 1))
-    fi
-
-    # Non-critical: Agent Mail server can start
-    if [[ -x "$TARGET_HOME/mcp_agent_mail/scripts/run_server_with_token.sh" ]]; then
-        echo "✅ Agent Mail: installed (run 'am' to start)" >&2
-    else
-        echo "⚠️ Agent Mail: not installed (re-run installer phase 8)" >&2
-        ((warnings += 1))
-    fi
-
-    # Non-critical: Stack tools respond to --help
-    local stack_help_fail=()
-    local stack_tools=(ntm ubs bv cass cm caam slb)
-    for tool in "${stack_tools[@]}"; do
-        # SLB may have issues with --help exit code, try bare command first
-        if [[ "$tool" == "slb" ]]; then
-            if ! _smoke_run_as_target "command -v slb >/dev/null && (slb >/dev/null 2>&1 || slb --help >/dev/null 2>&1)"; then
-                stack_help_fail+=("$tool")
-            fi
-        elif ! _smoke_run_as_target "command -v $tool >/dev/null && $tool --help >/dev/null 2>&1"; then
-            stack_help_fail+=("$tool")
-        fi
-    done
-    if [[ ${#stack_help_fail[@]} -gt 0 ]]; then
-        echo "⚠️ Stack tools: --help failed for ${stack_help_fail[*]}" >&2
-        ((warnings += 1))
-    fi
-
-    # Non-critical: PostgreSQL service running
-    if [[ "$SKIP_POSTGRES" == "true" ]]; then
-        echo "⚠️ PostgreSQL: skipped (optional)" >&2
-        ((warnings += 1))
-    elif command_exists systemctl && [[ -d /run/systemd/system ]] && systemctl is-active --quiet postgresql 2>/dev/null; then
-        echo "✅ PostgreSQL: running" >&2
-    elif command_exists pg_isready && pg_isready -q 2>/dev/null; then
-        echo "✅ PostgreSQL: running" >&2
-    else
-        echo "⚠️ PostgreSQL: not running (optional)" >&2
-        ((warnings += 1))
-    fi
-
-    # Non-critical: Vault installed
-    if [[ "$SKIP_VAULT" == "true" ]]; then
-        echo "⚠️ Vault: skipped (optional)" >&2
-        ((warnings += 1))
-    elif command_exists vault; then
-        echo "✅ Vault: installed" >&2
-    else
-        echo "⚠️ Vault: not installed (optional)" >&2
-        ((warnings += 1))
-    fi
-
-    # Non-critical: Cloud CLIs installed
-    if [[ "$SKIP_CLOUD" == "true" ]]; then
-        echo "⚠️ Cloud CLIs: skipped (optional)" >&2
-        ((warnings += 1))
-    else
-        local missing_cloud=()
-        binary_installed "wrangler" || missing_cloud+=("wrangler")
-        binary_installed "supabase" || missing_cloud+=("supabase")
-        binary_installed "vercel" || missing_cloud+=("vercel")
-
-        if [[ ${#missing_cloud[@]} -eq 0 ]]; then
-            echo "✅ Cloud CLIs: wrangler, supabase, vercel" >&2
-        else
-            echo "⚠️ Cloud CLIs: missing ${missing_cloud[*]} (optional)" >&2
-            ((warnings += 1))
-        fi
     fi
 
     echo "" >&2
@@ -3623,14 +3106,10 @@ $tailscale_section
      exit
      ssh $TARGET_USER@YOUR_SERVER_IP
 
-  2. Run the onboarding tutorial:
-     onboard
-
-  3. Check everything is working:
-     acfs doctor
-
-  4. Start your agent cockpit:
-     ntm"
+  2. Start using your AI coding agents:
+     claude    # Claude Code
+     codex     # OpenAI Codex
+     gemini    # Google Gemini"
 
     {
         if [[ "$HAS_GUM" == "true" ]]; then
@@ -3703,16 +3182,10 @@ $summary_content"
             if [[ "${ACFS_SSH_KEY_WARNING:-false}" == "true" ]]; then
                 step_num=3
             fi
-            echo "  $step_num. Run the onboarding tutorial:"
-            echo -e "     ${BLUE}onboard${NC}"
-            echo ""
-            ((step_num++))
-            echo "  $step_num. Check everything is working:"
-            echo -e "     ${BLUE}acfs doctor${NC}"
-            echo ""
-            ((step_num++))
-            echo "  $step_num. Start your agent cockpit:"
-            echo -e "     ${BLUE}ntm${NC}"
+            echo "  $step_num. Start using your AI coding agents:"
+            echo -e "     ${BLUE}claude${NC}    # Claude Code"
+            echo -e "     ${BLUE}codex${NC}     # OpenAI Codex"
+            echo -e "     ${BLUE}gemini${NC}    # Google Gemini"
             echo ""
             echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
             echo ""
@@ -3969,14 +3442,13 @@ main() {
             fi
         }
 
-        _run_phase_with_report "user_setup" "1/8 User Setup" normalize_user
-        _run_phase_with_report "filesystem" "2/8 Filesystem" setup_filesystem
-        _run_phase_with_report "shell_setup" "3/8 Shell Setup" setup_shell
-        _run_phase_with_report "cli_tools" "4/8 CLI Tools" install_cli_tools
-        _run_phase_with_report "languages" "5/8 Languages" install_languages
-        _run_phase_with_report "agents" "6/8 Coding Agents" install_agents_phase
-        _run_phase_with_report "cloud_db" "7/8 Cloud & DB" install_cloud_db
-        _run_phase_with_report "finalize" "8/8 Finalize" finalize
+        _run_phase_with_report "user_setup" "1/7 User Setup" normalize_user
+        _run_phase_with_report "filesystem" "2/7 Filesystem" setup_filesystem
+        _run_phase_with_report "shell_setup" "3/7 Shell Setup" setup_shell
+        _run_phase_with_report "cli_tools" "4/7 CLI Tools" install_cli_tools
+        _run_phase_with_report "languages" "5/7 Languages" install_languages
+        _run_phase_with_report "agents" "6/7 Coding Agents" install_agents_phase
+        _run_phase_with_report "finalize" "7/7 Finalize" finalize
 
         # Calculate installation time for success report
         local installation_end_time total_seconds
