@@ -262,7 +262,7 @@ check_network_installers() {
         "https://bun.sh/install:Bun installer"
         "https://astral.sh/uv/install.sh:UV/Python installer"
         "https://sh.rustup.rs:Rust installer"
-        "https://raw.githubusercontent.com/Dicklesworthstone/agentic_coding_flywheel_setup/main/README.md:GitHub raw content"
+        "https://raw.githubusercontent.com/seanGSISG/WSL2-AI-AUTOCONFIG/main/README.md:GitHub raw content"
     )
 
     local all_ok=true

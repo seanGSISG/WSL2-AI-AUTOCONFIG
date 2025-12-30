@@ -175,7 +175,7 @@ install_acfs_zshrc() {
     log_detail "Installing ACFS zshrc..."
 
     curl --proto '=https' --proto-redir '=https' -fsSL -o "$acfs_zshrc" \
-        "${ACFS_RAW:-https://raw.githubusercontent.com/Dicklesworthstone/agentic_coding_flywheel_setup/${ACFS_REF:-main}}/acfs/zsh/acfs.zshrc"
+        "${WSL2AIAC_RAW:-https://raw.githubusercontent.com/seanGSISG/WSL2-AI-AUTOCONFIG/${WSL2AIAC_REF:-main}}/config/zsh/wsl2aiac.zshrc"
 
     if [[ ! -f "$acfs_zshrc" ]]; then
         log_error "Failed to download ACFS zshrc"

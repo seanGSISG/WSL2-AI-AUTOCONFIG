@@ -220,12 +220,12 @@ if [[ -n "${ACFS_BOOTSTRAP_DIR:-}" ]] && [[ -f "${ACFS_BOOTSTRAP_DIR}/packages/o
 elif [[ -f "packages/onboard/onboard.sh" ]]; then
   cp "packages/onboard/onboard.sh" ~/.local/bin/onboard
 else
-  ACFS_RAW="${ACFS_RAW:-https://raw.githubusercontent.com/Dicklesworthstone/agentic_coding_flywheel_setup/main}"
+  WSL2AIAC_RAW="${WSL2AIAC_RAW:-https://raw.githubusercontent.com/seanGSISG/WSL2-AI-AUTOCONFIG/main}"
   CURL_ARGS=(-fsSL)
   if curl --help all 2>/dev/null | grep -q -- '--proto'; then
     CURL_ARGS=(--proto '=https' --proto-redir '=https' -fsSL)
   fi
-  curl "${CURL_ARGS[@]}" "${ACFS_RAW}/packages/onboard/onboard.sh" -o ~/.local/bin/onboard
+  curl "${CURL_ARGS[@]}" "${WSL2AIAC_RAW}/packages/onboard/onboard.sh" -o ~/.local/bin/onboard
 fi
 chmod +x ~/.local/bin/onboard
 INSTALL_ACFS_ONBOARD
@@ -278,12 +278,12 @@ if [[ -n "${ACFS_BOOTSTRAP_DIR:-}" ]] && [[ -f "${ACFS_BOOTSTRAP_DIR}/scripts/ac
 elif [[ -f "scripts/acfs-update" ]]; then
   cp "scripts/acfs-update" ~/.local/bin/acfs-update
 else
-  ACFS_RAW="${ACFS_RAW:-https://raw.githubusercontent.com/Dicklesworthstone/agentic_coding_flywheel_setup/main}"
+  WSL2AIAC_RAW="${WSL2AIAC_RAW:-https://raw.githubusercontent.com/seanGSISG/WSL2-AI-AUTOCONFIG/main}"
   CURL_ARGS=(-fsSL)
   if curl --help all 2>/dev/null | grep -q -- '--proto'; then
     CURL_ARGS=(--proto '=https' --proto-redir '=https' -fsSL)
   fi
-  curl "${CURL_ARGS[@]}" "${ACFS_RAW}/scripts/acfs-update" -o ~/.local/bin/acfs-update
+  curl "${CURL_ARGS[@]}" "${WSL2AIAC_RAW}/scripts/acfs-update" -o ~/.local/bin/acfs-update
 fi
 chmod +x ~/.local/bin/acfs-update
 INSTALL_ACFS_UPDATE
@@ -336,12 +336,12 @@ if [[ -n "${ACFS_BOOTSTRAP_DIR:-}" ]] && [[ -f "${ACFS_BOOTSTRAP_DIR}/scripts/li
 elif [[ -f "scripts/lib/doctor.sh" ]]; then
   cp "scripts/lib/doctor.sh" ~/.local/bin/acfs
 else
-  ACFS_RAW="${ACFS_RAW:-https://raw.githubusercontent.com/Dicklesworthstone/agentic_coding_flywheel_setup/main}"
+  WSL2AIAC_RAW="${WSL2AIAC_RAW:-https://raw.githubusercontent.com/seanGSISG/WSL2-AI-AUTOCONFIG/main}"
   CURL_ARGS=(-fsSL)
   if curl --help all 2>/dev/null | grep -q -- '--proto'; then
     CURL_ARGS=(--proto '=https' --proto-redir '=https' -fsSL)
   fi
-  curl "${CURL_ARGS[@]}" "${ACFS_RAW}/scripts/lib/doctor.sh" -o ~/.local/bin/acfs
+  curl "${CURL_ARGS[@]}" "${WSL2AIAC_RAW}/scripts/lib/doctor.sh" -o ~/.local/bin/acfs
 fi
 chmod +x ~/.local/bin/acfs
 INSTALL_ACFS_DOCTOR

@@ -36,7 +36,6 @@ UPDATE_APT=true
 UPDATE_AGENTS=true
 UPDATE_CLOUD=true
 UPDATE_RUNTIME=true
-UPDATE_STACK=false
 UPDATE_SHELL=true
 FORCE_MODE=false
 DRY_RUN=false
@@ -385,7 +384,6 @@ update_require_security() {
         echo "═══════════════════════════════════════════════════════════════" >&2
         echo "" >&2
         echo "  The security verification script is missing." >&2
-        echo "  This is required for --stack updates." >&2
         echo "" >&2
         echo "  Checked locations:" >&2
         echo "    - $SCRIPT_DIR/security.sh" >&2
@@ -978,102 +976,6 @@ update_go() {
     log_to_file "Go version: $go_version (path: $go_path)"
 }
 
-update_stack() {
-    log_section "Dicklesworthstone Stack"
-
-    if [[ "$UPDATE_STACK" != "true" ]]; then
-        log_item "skip" "stack update" "disabled (use --stack to enable)"
-        return 0
-    fi
-
-    if ! update_require_security; then
-        log_item "fail" "stack updates" "security verification unavailable (missing security.sh/checksums.yaml)"
-        return 0
-    fi
-
-    # NTM
-    if cmd_exists ntm; then
-        run_cmd "NTM" update_run_verified_installer ntm
-    fi
-
-    # MCP Agent Mail - Special handling for tmux (server blocks)
-    # Note: Version tracking not possible for async tmux updates
-    if cmd_exists "am" || [[ -d "$HOME/mcp_agent_mail" ]]; then
-        if cmd_exists tmux; then
-            local tool="mcp_agent_mail"
-            local url="${KNOWN_INSTALLERS[$tool]:-}"
-            local expected_sha256
-            expected_sha256="$(get_checksum "$tool")"
-
-            if [[ -n "$url" ]] && [[ -n "$expected_sha256" ]]; then
-                # Fetch and verify content first
-                local tmp_install
-                tmp_install=$(mktemp "${TMPDIR:-/tmp}/acfs-install-am.XXXXXX" 2>/dev/null) || tmp_install=""
-                if [[ -z "$tmp_install" ]]; then
-                    log_item "fail" "MCP Agent Mail" "failed to create temp file for verified installer"
-                else
-                    if verify_checksum "$url" "$expected_sha256" "$tool" > "$tmp_install"; then
-                        chmod +x "$tmp_install"
-
-                        local tmux_session="acfs-services"
-                        # Kill old session if exists
-                        tmux kill-session -t "$tmux_session" 2>/dev/null || true
-
-                        # Launch in tmux (tmux does not split a single string into argv).
-                        # NOTE: run_cmd always returns 0 (unless aborting), so do not use it in an `if ...; then` check.
-                        run_cmd "MCP Agent Mail (tmux)" tmux new-session -d -s "$tmux_session" "$tmp_install" --dir "$HOME/mcp_agent_mail" --yes
-
-                        # Confirm session exists before printing "running" hint (avoids misleading output on failure).
-                        if tmux has-session -t "$tmux_session" 2>/dev/null; then
-                            log_to_file "Started MCP Agent Mail update in tmux session: $tmux_session"
-                            [[ "$QUIET" != "true" ]] && echo -e "       ${DIM}Update running in tmux session '$tmux_session'${NC}"
-                        fi
-
-                        # Cleanup happens when system tmp is cleaned
-                    else
-                        rm -f "$tmp_install"
-                        log_item "fail" "MCP Agent Mail" "verification failed"
-                    fi
-                fi
-            else
-                log_item "fail" "MCP Agent Mail" "unknown installer URL/checksum"
-            fi
-        else
-            log_item "skip" "MCP Agent Mail" "tmux not found (required for update)"
-        fi
-    fi
-
-    # UBS
-    if cmd_exists ubs; then
-        run_cmd "Ultimate Bug Scanner" update_run_verified_installer ubs --easy-mode
-    fi
-
-    # Beads Viewer
-    if cmd_exists bv; then
-        run_cmd "Beads Viewer" update_run_verified_installer bv
-    fi
-
-    # CASS
-    if cmd_exists cass; then
-        run_cmd "CASS" update_run_verified_installer cass --easy-mode --verify
-    fi
-
-    # CASS Memory
-    if cmd_exists cm; then
-        run_cmd "CASS Memory" update_run_verified_installer cm --easy-mode --verify
-    fi
-
-    # CAAM
-    if cmd_exists caam; then
-        run_cmd "CAAM" update_run_verified_installer caam
-    fi
-
-    # SLB
-    if cmd_exists slb; then
-        run_cmd "SLB" update_run_verified_installer slb
-    fi
-}
-
 # ============================================================
 # Shell Tool Updates
 # Related: bead db0
@@ -1383,7 +1285,6 @@ CATEGORY OPTIONS (select what to update):
   --cloud-only       Only update cloud CLIs (Wrangler, Supabase, Vercel)
   --shell-only       Only update shell tools (OMZ, P10K, plugins, Atuin, Zoxide)
   --runtime-only     Only update runtimes (Bun, Rust, uv, Go)
-  --stack            Include Dicklesworthstone stack tools (default: disabled)
 
 SKIP OPTIONS (exclude categories from update):
   --no-apt           Skip apt update/upgrade
@@ -1406,9 +1307,6 @@ EXAMPLES:
   # Standard update (apt, runtimes, shell, agents, cloud)
   acfs-update
 
-  # Include Dicklesworthstone stack
-  acfs-update --stack
-
   # Only update agents
   acfs-update --agents-only
 
@@ -1425,7 +1323,7 @@ EXAMPLES:
   acfs-update --yes --quiet
 
   # Strict mode: stop on first error
-  acfs-update --abort-on-failure --stack
+  acfs-update --abort-on-failure
 
 WHAT EACH CATEGORY UPDATES:
   apt:      System packages via apt update && apt upgrade
@@ -1501,7 +1399,6 @@ main() {
                 UPDATE_AGENTS=false
                 UPDATE_CLOUD=false
                 UPDATE_RUNTIME=false
-                UPDATE_STACK=false
                 UPDATE_SHELL=false
                 shift
                 ;;
@@ -1510,7 +1407,6 @@ main() {
                 UPDATE_AGENTS=true
                 UPDATE_CLOUD=false
                 UPDATE_RUNTIME=false
-                UPDATE_STACK=false
                 UPDATE_SHELL=false
                 shift
                 ;;
@@ -1519,7 +1415,6 @@ main() {
                 UPDATE_AGENTS=false
                 UPDATE_CLOUD=true
                 UPDATE_RUNTIME=false
-                UPDATE_STACK=false
                 UPDATE_SHELL=false
                 shift
                 ;;
@@ -1528,7 +1423,6 @@ main() {
                 UPDATE_AGENTS=false
                 UPDATE_CLOUD=false
                 UPDATE_RUNTIME=false
-                UPDATE_STACK=false
                 UPDATE_SHELL=true
                 shift
                 ;;
@@ -1537,12 +1431,7 @@ main() {
                 UPDATE_AGENTS=false
                 UPDATE_CLOUD=false
                 UPDATE_RUNTIME=true
-                UPDATE_STACK=false
                 UPDATE_SHELL=false
-                shift
-                ;;
-            --stack)
-                UPDATE_STACK=true
                 shift
                 ;;
             --no-apt)

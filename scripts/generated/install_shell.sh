@@ -204,13 +204,13 @@ INSTALL_SHELL_OMZ
     else
         if ! run_as_target_shell <<'INSTALL_SHELL_OMZ'
 # Install ACFS zshrc
-ACFS_RAW="${ACFS_RAW:-https://raw.githubusercontent.com/Dicklesworthstone/agentic_coding_flywheel_setup/main}"
-mkdir -p ~/.acfs/zsh
+WSL2AIAC_RAW="${WSL2AIAC_RAW:-https://raw.githubusercontent.com/seanGSISG/WSL2-AI-AUTOCONFIG/main}"
+mkdir -p ~/.wsl2aiac/zsh
 CURL_ARGS=(-fsSL)
 if curl --help all 2>/dev/null | grep -q -- '--proto'; then
   CURL_ARGS=(--proto '=https' --proto-redir '=https' -fsSL)
 fi
-curl "${CURL_ARGS[@]}" -o ~/.acfs/zsh/acfs.zshrc "${ACFS_RAW}/acfs/zsh/acfs.zshrc"
+curl "${CURL_ARGS[@]}" -o ~/.wsl2aiac/zsh/wsl2aiac.zshrc "${WSL2AIAC_RAW}/config/zsh/wsl2aiac.zshrc"
 INSTALL_SHELL_OMZ
         then
             log_error "shell.omz: install command failed: # Install ACFS zshrc"
@@ -222,12 +222,12 @@ INSTALL_SHELL_OMZ
     else
         if ! run_as_target_shell <<'INSTALL_SHELL_OMZ'
 # Install pre-configured Powerlevel10k settings (prevents config wizard on first login)
-ACFS_RAW="${ACFS_RAW:-https://raw.githubusercontent.com/Dicklesworthstone/agentic_coding_flywheel_setup/main}"
+WSL2AIAC_RAW="${WSL2AIAC_RAW:-https://raw.githubusercontent.com/seanGSISG/WSL2-AI-AUTOCONFIG/main}"
 CURL_ARGS=(-fsSL)
 if curl --help all 2>/dev/null | grep -q -- '--proto'; then
   CURL_ARGS=(--proto '=https' --proto-redir '=https' -fsSL)
 fi
-curl "${CURL_ARGS[@]}" -o ~/.p10k.zsh "${ACFS_RAW}/acfs/zsh/p10k.zsh"
+curl "${CURL_ARGS[@]}" -o ~/.p10k.zsh "${WSL2AIAC_RAW}/config/zsh/p10k.zsh"
 INSTALL_SHELL_OMZ
         then
             log_error "shell.omz: install command failed: # Install pre-configured Powerlevel10k settings (prevents config wizard on first login)"
@@ -243,7 +243,7 @@ if [[ -f ~/.zshrc ]] && ! grep -q "ACFS loader" ~/.zshrc; then
   mv ~/.zshrc ~/.zshrc.bak.$(date +%s)
 fi
 echo '# ACFS loader' > ~/.zshrc
-echo 'source "$HOME/.acfs/zsh/acfs.zshrc"' >> ~/.zshrc
+echo 'source "$HOME/.wsl2aiac/zsh/wsl2aiac.zshrc"' >> ~/.zshrc
 echo '' >> ~/.zshrc
 echo '# User overrides live here forever' >> ~/.zshrc
 echo '[ -f "$HOME/.zshrc.local" ] && source "$HOME/.zshrc.local"' >> ~/.zshrc
@@ -317,13 +317,13 @@ INSTALL_SHELL_OMZ
         fi
     fi
     if [[ "${DRY_RUN:-false}" = "true" ]]; then
-        log_info "dry-run: verify: test -f ~/.acfs/zsh/acfs.zshrc (target_user)"
+        log_info "dry-run: verify: test -f ~/.wsl2aiac/zsh/wsl2aiac.zshrc (target_user)"
     else
         if ! run_as_target_shell <<'INSTALL_SHELL_OMZ'
-test -f ~/.acfs/zsh/acfs.zshrc
+test -f ~/.wsl2aiac/zsh/wsl2aiac.zshrc
 INSTALL_SHELL_OMZ
         then
-            log_error "shell.omz: verify failed: test -f ~/.acfs/zsh/acfs.zshrc"
+            log_error "shell.omz: verify failed: test -f ~/.wsl2aiac/zsh/wsl2aiac.zshrc"
             return 1
         fi
     fi

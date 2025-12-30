@@ -97,17 +97,7 @@ readonly RECOMMENDED_TOOLS=(
     "vercel"
     "fly"
     "docker"
-    
-    # Dicklesworthstone stack
-    "ntm"
-    "mcp_agent_mail"
-    "ubs"
-    "bv"
-    "cass"
-    "cm"
-    "caam"
-    "slb"
-    
+
     # Database
     "postgres"
     "postgresql"

@@ -17,10 +17,9 @@ Here's what's installed on your VPS:
 - **Modern CLI tools** like lsd, bat, ripgrep, fzf, and zoxide
 - **Language runtimes** for JavaScript (Bun), Python (uv), Rust, and Go
 - **Three coding agents** ready to help you build:
-  - Claude Code (`cc`)
+  - Claude Code (`ccd`)
   - Codex CLI (`cod`)
   - Gemini CLI (`gmi`)
-- **The Dicklesworthstone stack** for agent coordination and memory
 
 ---
 

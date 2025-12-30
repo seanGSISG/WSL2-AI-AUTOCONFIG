@@ -201,18 +201,7 @@ _check_agents() {
     fi
 }
 
-# Check 7: NTM command works
-_check_ntm() {
-    if command -v ntm &>/dev/null || [[ -x "$TARGET_HOME/.local/bin/ntm" ]] || [[ -x "$TARGET_HOME/.acfs/bin/ntm" ]]; then
-        _smoke_pass "NTM: installed"
-        return 0
-    else
-        _smoke_fail "NTM: not found" "Re-run the ACFS installer (stack phase)"
-        return 1
-    fi
-}
-
-# Check 8: Onboard command exists
+# Check 7: Onboard command exists
 _check_onboard() {
     if command -v onboard &>/dev/null || [[ -x "$TARGET_HOME/.local/bin/onboard" ]] || [[ -x "$TARGET_HOME/.acfs/bin/onboard" ]]; then
         _smoke_pass "Onboard: installed"
@@ -293,7 +282,6 @@ run_smoke_test() {
     _check_workspace
     _check_languages
     _check_agents
-    _check_ntm
     _check_onboard
 
     echo ""

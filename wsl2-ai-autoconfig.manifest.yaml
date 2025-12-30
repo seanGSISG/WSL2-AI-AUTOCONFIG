@@ -1,7 +1,7 @@
 # WSL2-AI-AUTOCONFIG Module Manifest
 # Single source of truth for all tools installed by WSL2-AI-AUTOCONFIG
 # Version: 1.0.0
-# Stripped-down fork without cloud tools, Dicklesworthstone stack, or VPS features
+# Stripped-down fork without cloud tools or VPS features
 
 version: 2
 name: wsl2_ai_autoconfig
@@ -162,28 +162,28 @@ modules:
         fi
       - |
         # Install ACFS zshrc
-        ACFS_RAW="${ACFS_RAW:-https://raw.githubusercontent.com/Dicklesworthstone/agentic_coding_flywheel_setup/main}"
+        WSL2AIAC_RAW="${WSL2AIAC_RAW:-https://raw.githubusercontent.com/seanGSISG/WSL2-AI-AUTOCONFIG/main}"
         mkdir -p ~/.wsl2aiac/zsh
         CURL_ARGS=(-fsSL)
         if curl --help all 2>/dev/null | grep -q -- '--proto'; then
           CURL_ARGS=(--proto '=https' --proto-redir '=https' -fsSL)
         fi
-        curl "${CURL_ARGS[@]}" -o ~/.wsl2aiac/zsh/acfs.zshrc "${ACFS_RAW}/acfs/zsh/acfs.zshrc"
+        curl "${CURL_ARGS[@]}" -o ~/.wsl2aiac/zsh/wsl2aiac.zshrc "${WSL2AIAC_RAW}/config/zsh/wsl2aiac.zshrc"
       - |
         # Install pre-configured Powerlevel10k settings (prevents config wizard on first login)
-        ACFS_RAW="${ACFS_RAW:-https://raw.githubusercontent.com/Dicklesworthstone/agentic_coding_flywheel_setup/main}"
+        WSL2AIAC_RAW="${WSL2AIAC_RAW:-https://raw.githubusercontent.com/seanGSISG/WSL2-AI-AUTOCONFIG/main}"
         CURL_ARGS=(-fsSL)
         if curl --help all 2>/dev/null | grep -q -- '--proto'; then
           CURL_ARGS=(--proto '=https' --proto-redir '=https' -fsSL)
         fi
-        curl "${CURL_ARGS[@]}" -o ~/.p10k.zsh "${ACFS_RAW}/acfs/zsh/p10k.zsh"
+        curl "${CURL_ARGS[@]}" -o ~/.p10k.zsh "${WSL2AIAC_RAW}/config/zsh/p10k.zsh"
       - |
         # Setup loader .zshrc
         if [[ -f ~/.zshrc ]] && ! grep -q "ACFS loader" ~/.zshrc; then
           mv ~/.zshrc ~/.zshrc.bak.$(date +%s)
         fi
         echo '# ACFS loader' > ~/.zshrc
-        echo 'source "$HOME/.acfs/zsh/acfs.zshrc"' >> ~/.zshrc
+        echo 'source "$HOME/.wsl2aiac/zsh/wsl2aiac.zshrc"' >> ~/.zshrc
         echo '' >> ~/.zshrc
         echo '# User overrides live here forever' >> ~/.zshrc
         echo '[ -f "$HOME/.zshrc.local" ] && source "$HOME/.zshrc.local"' >> ~/.zshrc
@@ -221,11 +221,11 @@ modules:
         fi
     verify:
       - test -d ~/.oh-my-zsh
-      - test -f ~/.wsl2aiac/zsh/acfs.zshrc
+      - test -f ~/.wsl2aiac/zsh/wsl2aiac.zshrc
       - test -f ~/.p10k.zsh
     notes:
       - "Oh My Zsh and plugins installed via verified upstream installers"
-      - "acfs.zshrc written from acfs/ assets"
+      - "wsl2aiac.zshrc written from config/ assets"
       - "Pre-configured p10k theme settings prevent wizard on first login"
 
   # ============================================================
@@ -632,12 +632,12 @@ modules:
         elif [[ -f "packages/onboard/onboard.sh" ]]; then
           cp "packages/onboard/onboard.sh" ~/.local/bin/onboard
         else
-          ACFS_RAW="${ACFS_RAW:-https://raw.githubusercontent.com/Dicklesworthstone/agentic_coding_flywheel_setup/main}"
+          WSL2AIAC_RAW="${WSL2AIAC_RAW:-https://raw.githubusercontent.com/seanGSISG/WSL2-AI-AUTOCONFIG/main}"
           CURL_ARGS=(-fsSL)
           if curl --help all 2>/dev/null | grep -q -- '--proto'; then
             CURL_ARGS=(--proto '=https' --proto-redir '=https' -fsSL)
           fi
-          curl "${CURL_ARGS[@]}" "${ACFS_RAW}/packages/onboard/onboard.sh" -o ~/.local/bin/onboard
+          curl "${CURL_ARGS[@]}" "${WSL2AIAC_RAW}/packages/onboard/onboard.sh" -o ~/.local/bin/onboard
         fi
         chmod +x ~/.local/bin/onboard
     verify:
@@ -663,12 +663,12 @@ modules:
         elif [[ -f "scripts/acfs-update" ]]; then
           cp "scripts/acfs-update" ~/.local/bin/acfs-update
         else
-          ACFS_RAW="${ACFS_RAW:-https://raw.githubusercontent.com/Dicklesworthstone/agentic_coding_flywheel_setup/main}"
+          WSL2AIAC_RAW="${WSL2AIAC_RAW:-https://raw.githubusercontent.com/seanGSISG/WSL2-AI-AUTOCONFIG/main}"
           CURL_ARGS=(-fsSL)
           if curl --help all 2>/dev/null | grep -q -- '--proto'; then
             CURL_ARGS=(--proto '=https' --proto-redir '=https' -fsSL)
           fi
-          curl "${CURL_ARGS[@]}" "${ACFS_RAW}/scripts/acfs-update" -o ~/.local/bin/acfs-update
+          curl "${CURL_ARGS[@]}" "${WSL2AIAC_RAW}/scripts/acfs-update" -o ~/.local/bin/acfs-update
         fi
         chmod +x ~/.local/bin/acfs-update
     verify:
@@ -694,12 +694,12 @@ modules:
         elif [[ -f "scripts/lib/doctor.sh" ]]; then
           cp "scripts/lib/doctor.sh" ~/.local/bin/acfs
         else
-          ACFS_RAW="${ACFS_RAW:-https://raw.githubusercontent.com/Dicklesworthstone/agentic_coding_flywheel_setup/main}"
+          WSL2AIAC_RAW="${WSL2AIAC_RAW:-https://raw.githubusercontent.com/seanGSISG/WSL2-AI-AUTOCONFIG/main}"
           CURL_ARGS=(-fsSL)
           if curl --help all 2>/dev/null | grep -q -- '--proto'; then
             CURL_ARGS=(--proto '=https' --proto-redir '=https' -fsSL)
           fi
-          curl "${CURL_ARGS[@]}" "${ACFS_RAW}/scripts/lib/doctor.sh" -o ~/.local/bin/acfs
+          curl "${CURL_ARGS[@]}" "${WSL2AIAC_RAW}/scripts/lib/doctor.sh" -o ~/.local/bin/acfs
         fi
         chmod +x ~/.local/bin/acfs
     verify:

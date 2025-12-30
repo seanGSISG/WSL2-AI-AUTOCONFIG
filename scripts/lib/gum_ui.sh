@@ -32,8 +32,8 @@ print_banner() {
     ║    ██║  ██║╚██████╗██║     ███████║                          ║
     ║    ╚═╝  ╚═╝ ╚═════╝╚═╝     ╚══════╝                          ║
     ║                                                               ║
-    ║    Agentic Coding Flywheel Setup                             ║
-    ║    github.com/Dicklesworthstone/agentic_coding_flywheel_setup║
+    ║    WSL2-AI-AUTOCONFIG                                         ║
+    ║    github.com/seanGSISG/WSL2-AI-AUTOCONFIG                   ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
 '

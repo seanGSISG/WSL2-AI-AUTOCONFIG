@@ -81,8 +81,7 @@ _ACFS_STATE_SH_LOADED=1
 #   Phase 5: Language runtimes     → languages
 #   Phase 6: Coding agents         → agents
 #   Phase 7: Cloud & database      → cloud_db
-#   Phase 8: Dicklesworthstone     → stack
-#   Phase 9: Final wiring          → finalize
+#   Phase 8: Final wiring          → finalize
 
 # Canonical ordered list of phase IDs (defines execution order)
 readonly ACFS_PHASE_IDS=(
@@ -93,7 +92,6 @@ readonly ACFS_PHASE_IDS=(
     "languages"
     "agents"
     "cloud_db"
-    "stack"
     "finalize"
 )
 
@@ -107,7 +105,6 @@ declare -gA ACFS_PHASE_NAMES=(
     [languages]="Language Runtimes"
     [agents]="Coding Agents"
     [cloud_db]="Cloud & Database Tools"
-    [stack]="Dicklesworthstone Stack"
     [finalize]="Final Wiring"
 )
 

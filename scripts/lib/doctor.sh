@@ -840,9 +840,8 @@ check_cloud() {
     return 0
 }
 
-# Check Dicklesworthstone stack (removed in WSL2-AI-AUTOCONFIG)
+# Stack tools check (not included in WSL2-AI-AUTOCONFIG)
 check_stack() {
-    # Stack tools not included in this stripped-down version
     return 0
 }
 

@@ -6,7 +6,7 @@
 #
 # Stripped-down fork of ACFS for WSL2 environments.
 # Installs: shell setup, CLI tools, language runtimes, AI coding agents.
-# Removed: cloud tools, Dicklesworthstone stack, VPS/SSH features.
+# Removed: cloud tools, VPS/SSH features.
 #
 # Usage:
 #   curl -fsSL "https://raw.githubusercontent.com/seanGSISG/WSL2-AI-AUTOCONFIG/main/install.sh" | bash -s -- --yes --mode vibe
@@ -988,7 +988,7 @@ print_execution_plan() {
 # Related beads: agentic_coding_flywheel_setup-545
 
 run_preflight_checks() {
-    log_step "0/9" "Running pre-flight validation..."
+    log_step "0/8" "Running pre-flight validation..."
 
     local preflight_script=""
     local preflight_tmp=""
@@ -1961,7 +1961,7 @@ run_ubuntu_upgrade_phase() {
         return 0
     fi
 
-    log_step "-1/9" "Ubuntu Auto-Upgrade"
+    log_step "-1/8" "Ubuntu Auto-Upgrade"
     # Format path for display (e.g., "25.04 → 25.10")
     local upgrade_path_display
     upgrade_path_display=$(echo "$upgrade_path" | tr '\n' ' ' | sed 's/ $//; s/ / → /g')
@@ -2136,7 +2136,7 @@ run_ubuntu_upgrade_phase() {
 
 ensure_base_deps() {
     set_phase "base_deps" "Base Dependencies" 1
-    log_step "0/9" "Checking base dependencies..."
+    log_step "0/8" "Checking base dependencies..."
 
     if acfs_use_generated_category "base"; then
         log_detail "Using generated installers for base (phase 1)"
@@ -2167,7 +2167,7 @@ ensure_base_deps() {
 # ============================================================
 normalize_user() {
     set_phase "user_setup" "User Normalization"
-    log_step "1/9" "Normalizing user account..."
+    log_step "1/8" "Normalizing user account..."
 
     if [[ $EUID -eq 0 ]] && type -t prompt_ssh_key &>/dev/null; then
         if ! prompt_ssh_key; then
@@ -2264,7 +2264,7 @@ normalize_user() {
 # ============================================================
 setup_filesystem() {
     set_phase "filesystem" "Filesystem Setup"
-    log_step "2/9" "Setting up filesystem..."
+    log_step "2/8" "Setting up filesystem..."
 
     if acfs_use_generated_category "filesystem"; then
         log_detail "Using generated installers for filesystem (phase 3)"
@@ -2329,7 +2329,7 @@ setup_filesystem() {
 # ============================================================
 setup_shell() {
     set_phase "shell_setup" "Shell Setup"
-    log_step "3/9" "Setting up shell..."
+    log_step "3/8" "Setting up shell..."
 
     if acfs_use_generated_category "shell"; then
         log_detail "Using generated installers for shell (phase 4)"
@@ -2506,7 +2506,7 @@ install_github_cli() {
 
 install_cli_tools() {
     set_phase "cli_tools" "CLI Tools"
-    log_step "4/9" "Installing CLI tools..."
+    log_step "4/8" "Installing CLI tools..."
 
     local used_generated_cli=false
     local used_generated_network=false
@@ -2807,7 +2807,7 @@ install_languages_legacy_tools() {
 
 install_languages() {
     set_phase "languages" "Language Runtimes"
-    log_step "5/9" "Installing language runtimes..."
+    log_step "5/8" "Installing language runtimes..."
 
     local ran_any=false
 
@@ -2841,7 +2841,7 @@ install_languages() {
 # ============================================================
 install_agents_phase() {
     set_phase "agents" "Coding Agents"
-    log_step "6/9" "Installing coding agents..."
+    log_step "6/8" "Installing coding agents..."
 
     if acfs_use_generated_category "agents"; then
         log_detail "Using generated installers for agents (phase 7)"
@@ -3272,7 +3272,7 @@ install_cloud_db_legacy() {
 
 install_cloud_db() {
     set_phase "cloud_db" "Cloud & Database Tools"
-    log_step "7/9" "Installing cloud & database tools..."
+    log_step "7/8" "Installing cloud & database tools..."
 
     local codename="noble"
     if [[ -f /etc/os-release ]]; then
@@ -3318,151 +3318,11 @@ install_cloud_db() {
 }
 
 # ============================================================
-# Phase 8: Dicklesworthstone stack
-# ============================================================
-
-# Helper: check if a binary exists in common install locations
-binary_installed() {
-    local name="$1"
-    [[ -x "$TARGET_HOME/.local/bin/$name" ]] || \
-    [[ -x "/usr/local/bin/$name" ]] || \
-    [[ -x "$TARGET_HOME/.bun/bin/$name" ]] || \
-    [[ -x "$TARGET_HOME/.cargo/bin/$name" ]]
-}
-
-install_stack_phase() {
-    set_phase "stack" "Dicklesworthstone Stack"
-    log_step "8/9" "Installing Dicklesworthstone stack..."
-
-    if acfs_use_generated_category "stack"; then
-        log_detail "Using generated installers for stack (phase 9)"
-        acfs_run_generated_category_phase "stack" "9" || return 1
-        log_success "Dicklesworthstone stack installed"
-        return 0
-    fi
-
-    # NTM (Named Tmux Manager)
-    if binary_installed "ntm"; then
-        log_detail "NTM already installed"
-    else
-        log_detail "Installing NTM"
-        # The upstream installer can exit non-zero in non-interactive CI while still
-        # successfully installing. Run it best-effort, then verify the binary.
-        local ntm_exit=0
-        acfs_run_verified_upstream_script_as_target "ntm" "bash" --no-shell || ntm_exit=$?
-
-        if _smoke_run_as_target "command -v ntm >/dev/null && ntm --help >/dev/null 2>&1"; then
-            log_success "NTM installed"
-        else
-            log_warn "NTM installation failed (installer exit ${ntm_exit}; ntm not working)"
-        fi
-    fi
-
-    # MCP Agent Mail (check for mcp-agent-mail stub or mcp_agent_mail directory)
-    # NOTE: We run this in tmux because the installer starts the server which blocks
-    if binary_installed "mcp-agent-mail" || [[ -d "$TARGET_HOME/mcp_agent_mail" ]]; then
-        log_detail "MCP Agent Mail already installed"
-    else
-        log_detail "Installing MCP Agent Mail (in tmux session)"
-        # Create or use acfs-services tmux session, run installer in first pane.
-        # The installer will start the server, which runs persistently in tmux.
-        local tmux_session="acfs-services"
-        local tool="mcp_agent_mail"
-        local target_dir="$TARGET_HOME/mcp_agent_mail"
-
-        # Fetch + verify the installer script, then run it in tmux to avoid blocking.
-        if acfs_load_upstream_checksums; then
-            local url="${ACFS_UPSTREAM_URLS[$tool]:-}"
-            local expected_sha256="${ACFS_UPSTREAM_SHA256[$tool]:-}"
-
-            if [[ -z "$url" ]] || [[ -z "$expected_sha256" ]]; then
-                log_warn "MCP Agent Mail: missing installer URL/checksum"
-            else
-                local tmp_install
-                tmp_install="$(mktemp "${TMPDIR:-/tmp}/acfs-install-${tool}.XXXXXX" 2>/dev/null)" || tmp_install=""
-
-                if [[ -n "$tmp_install" ]] && verify_checksum "$url" "$expected_sha256" "$tool" > "$tmp_install"; then
-                    chmod 755 "$tmp_install" 2>/dev/null || true
-
-                    # Kill existing session if any (clean slate)
-                    run_as_target tmux kill-session -t "$tmux_session" 2>/dev/null || true
-
-                    # Create new detached session and run the installer
-                    if try_step "Installing MCP Agent Mail in tmux" run_as_target tmux new-session -d -s "$tmux_session" "$tmp_install" --dir "$target_dir" --yes; then
-                        log_success "MCP Agent Mail installing in tmux session '$tmux_session'"
-                        log_info "Attach with: tmux attach -t $tmux_session"
-                        # Give it a moment to start
-                        sleep 5
-                    else
-                        log_warn "MCP Agent Mail tmux installation may have failed"
-                    fi
-                else
-                    rm -f "$tmp_install" 2>/dev/null || true
-                    log_warn "MCP Agent Mail: installer verification failed"
-                fi
-            fi
-        else
-            log_warn "MCP Agent Mail: unable to load upstream checksums; refusing to run unverified installer"
-        fi
-    fi
-
-    # Ultimate Bug Scanner
-    if binary_installed "ubs"; then
-        log_detail "Ultimate Bug Scanner already installed"
-    else
-        log_detail "Installing Ultimate Bug Scanner"
-        try_step "Installing UBS" acfs_run_verified_upstream_script_as_target "ubs" "bash" --easy-mode || log_warn "UBS installation may have failed"
-    fi
-
-    # Beads Viewer
-    if binary_installed "bv"; then
-        log_detail "Beads Viewer already installed"
-    else
-        log_detail "Installing Beads Viewer"
-        try_step "Installing Beads Viewer" acfs_run_verified_upstream_script_as_target "bv" "bash" || log_warn "Beads Viewer installation may have failed"
-    fi
-
-    # CASS (Coding Agent Session Search)
-    if binary_installed "cass"; then
-        log_detail "CASS already installed"
-    else
-        log_detail "Installing CASS"
-        try_step "Installing CASS" acfs_run_verified_upstream_script_as_target "cass" "bash" --easy-mode --verify || log_warn "CASS installation may have failed"
-    fi
-
-    # CASS Memory System
-    if binary_installed "cm"; then
-        log_detail "CASS Memory System already installed"
-    else
-        log_detail "Installing CASS Memory System"
-        try_step "Installing CM" acfs_run_verified_upstream_script_as_target "cm" "bash" --easy-mode --verify || log_warn "CM installation may have failed"
-    fi
-
-    # CAAM (Coding Agent Account Manager)
-    if binary_installed "caam"; then
-        log_detail "CAAM already installed"
-    else
-        log_detail "Installing CAAM"
-        try_step "Installing CAAM" acfs_run_verified_upstream_script_as_target "caam" "bash" || log_warn "CAAM installation may have failed"
-    fi
-
-    # SLB (Simultaneous Launch Button)
-    if binary_installed "slb"; then
-        log_detail "SLB already installed"
-    else
-        log_detail "Installing SLB"
-        try_step "Installing SLB" acfs_run_verified_upstream_script_as_target "slb" "bash" || log_warn "SLB installation may have failed"
-    fi
-
-    log_success "Dicklesworthstone stack installed"
-}
-
-# ============================================================
-# Phase 9: Final wiring
+# Phase 8: Final wiring
 # ============================================================
 finalize() {
     set_phase "finalize" "Final Wiring"
-    log_step "9/9" "Finalizing installation..."
+    log_step "8/8" "Finalizing installation..."
 
     if acfs_use_generated_category "acfs"; then
         log_detail "Using generated installers for acfs (phase 10)"
@@ -4115,14 +3975,6 @@ main() {
         echo "  - Rust: https://rustup.rs"
         echo "  - uv: https://astral.sh/uv"
         echo "  - Claude Code (native): https://claude.ai/install.sh"
-        echo "  - NTM: https://github.com/Dicklesworthstone/ntm"
-        echo "  - MCP Agent Mail: https://github.com/Dicklesworthstone/mcp_agent_mail"
-        echo "  - UBS: https://github.com/Dicklesworthstone/ultimate_bug_scanner"
-        echo "  - Beads Viewer: https://github.com/Dicklesworthstone/beads_viewer"
-        echo "  - CASS: https://github.com/Dicklesworthstone/coding_agent_session_search"
-        echo "  - CM: https://github.com/Dicklesworthstone/cass_memory_system"
-        echo "  - CAAM: https://github.com/Dicklesworthstone/coding_agent_account_manager"
-        echo "  - SLB: https://github.com/Dicklesworthstone/simultaneous_launch_button"
         echo ""
         exit 0
     fi
@@ -4229,15 +4081,14 @@ main() {
             fi
         }
 
-        _run_phase_with_report "user_setup" "1/9 User Setup" normalize_user
-        _run_phase_with_report "filesystem" "2/9 Filesystem" setup_filesystem
-        _run_phase_with_report "shell_setup" "3/9 Shell Setup" setup_shell
-        _run_phase_with_report "cli_tools" "4/9 CLI Tools" install_cli_tools
-        _run_phase_with_report "languages" "5/9 Languages" install_languages
-        _run_phase_with_report "agents" "6/9 Coding Agents" install_agents_phase
-        _run_phase_with_report "cloud_db" "7/9 Cloud & DB" install_cloud_db
-        _run_phase_with_report "stack" "8/9 Stack" install_stack_phase
-        _run_phase_with_report "finalize" "9/9 Finalize" finalize
+        _run_phase_with_report "user_setup" "1/8 User Setup" normalize_user
+        _run_phase_with_report "filesystem" "2/8 Filesystem" setup_filesystem
+        _run_phase_with_report "shell_setup" "3/8 Shell Setup" setup_shell
+        _run_phase_with_report "cli_tools" "4/8 CLI Tools" install_cli_tools
+        _run_phase_with_report "languages" "5/8 Languages" install_languages
+        _run_phase_with_report "agents" "6/8 Coding Agents" install_agents_phase
+        _run_phase_with_report "cloud_db" "7/8 Cloud & DB" install_cloud_db
+        _run_phase_with_report "finalize" "8/8 Finalize" finalize
 
         # Calculate installation time for success report
         local installation_end_time total_seconds
@@ -4246,12 +4097,12 @@ main() {
 
         # Show completion message with progress display
         if type -t show_completion &>/dev/null; then
-            show_completion 9 "$total_seconds"
+            show_completion 8 "$total_seconds"
         fi
 
         # Report success with timing (mjt.5.8)
         if type -t report_success &>/dev/null; then
-            report_success 9 "$total_seconds"
+            report_success 8 "$total_seconds"
         fi
 
         SMOKE_TEST_FAILED=false

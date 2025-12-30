@@ -499,10 +499,9 @@ list_sessions() {
     # Check CASS is installed
     if ! check_cass_installed; then
         if [[ "$output_json" == "true" ]]; then
-            echo '{"error": "CASS not installed", "install": "See https://github.com/Dicklesworthstone/coding_agent_session_search"}'
+            echo '{"error": "CASS not installed"}'
         else
             log_error "CASS (Coding Agent Session Search) is not installed"
-            log_info "Install from: https://github.com/Dicklesworthstone/coding_agent_session_search"
         fi
         return 1
     fi

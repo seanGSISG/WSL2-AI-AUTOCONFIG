@@ -61,7 +61,7 @@ ccd "Hello! Let's build something."
 | Removed | Reason |
 |---------|--------|
 | Cloud Tools (Vault, PostgreSQL, Wrangler, Supabase, Vercel) | Focus on local dev |
-| Dicklesworthstone Stack (NTM, MCP Agent Mail, UBS, etc.) | Reduced complexity |
+| ACFS Stack Tools (NTM, MCP Agent Mail, UBS, etc.) | Reduced complexity |
 | VPS/SSH features (Tailscale, SSH key handling) | WSL2 doesn't need them |
 | Web UI | CLI-focused workflow |
 
