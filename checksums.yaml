@@ -1,0 +1,35 @@
+# checksums.yaml - Auto-generated 2025-12-30T17:02:17-07:00
+# Run: ./scripts/lib/security.sh --update-checksums
+
+installers:
+  zoxide:
+    url: "https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh"
+    sha256: "c5d94701cfdd87d19f3989c1239e921d4ff95d4c0742b16beca061618c937bf0"
+
+  claude:
+    url: "https://claude.ai/install.sh"
+    sha256: "54715810c1e802c8aca39cc867ae9b2ec764574e20f2a653c97ec61bebc07d68"
+
+  atuin:
+    url: "https://setup.atuin.sh"
+    sha256: "7cfabf7e18c03953f3fbd9288c97d9d8b47df3666da522ef903608de617370e7"
+
+  bun:
+    url: "https://bun.sh/install"
+    sha256: "16d1ca592a28bd08b3304073491c4304e50073da6b8af34f8d1e5e8c00fc64d5"
+
+  uv:
+    url: "https://astral.sh/uv/install.sh"
+    sha256: "38a2a3fb4d169fbc5b3533d1690feb9b1d909a74514a18169e1a2371fd4f3104"
+
+  nvm:
+    url: "https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh"
+    sha256: "abdb525ee9f5b48b34d8ed9fc67c6013fb0f659712e401ecd88ab989b3af8f53"
+
+  rust:
+    url: "https://sh.rustup.rs"
+    sha256: "17247e4bcacf6027ec2e11c79a72c494c9af69ac8d1abcc1b271fa4375a106c2"
+
+  ohmyzsh:
+    url: "https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh"
+    sha256: "ce0b7c94aa04d8c7a8137e45fe5c4744e3947871f785fd58117c480c1bf49352"

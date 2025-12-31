@@ -589,23 +589,23 @@ detect_environment() {
         # curl|bash mode: use bootstrap archive
         ACFS_LIB_DIR="$ACFS_BOOTSTRAP_DIR/scripts/lib"
         ACFS_GENERATED_DIR="$ACFS_BOOTSTRAP_DIR/scripts/generated"
-        ACFS_ASSETS_DIR="${ACFS_ASSETS_DIR:-$ACFS_BOOTSTRAP_DIR/acfs}"
+        ACFS_ASSETS_DIR="${ACFS_ASSETS_DIR:-$ACFS_BOOTSTRAP_DIR}"
         ACFS_CHECKSUMS_YAML="${ACFS_CHECKSUMS_YAML:-$ACFS_BOOTSTRAP_DIR/checksums.yaml}"
-        ACFS_MANIFEST_YAML="${ACFS_MANIFEST_YAML:-$ACFS_BOOTSTRAP_DIR/acfs.manifest.yaml}"
+        ACFS_MANIFEST_YAML="${ACFS_MANIFEST_YAML:-$ACFS_BOOTSTRAP_DIR/wsl2-ai-autoconfig.manifest.yaml}"
     elif [[ -n "${SCRIPT_DIR:-}" ]]; then
         # Local checkout mode
         ACFS_LIB_DIR="$SCRIPT_DIR/scripts/lib"
         ACFS_GENERATED_DIR="$SCRIPT_DIR/scripts/generated"
-        ACFS_ASSETS_DIR="$SCRIPT_DIR/acfs"
+        ACFS_ASSETS_DIR="$SCRIPT_DIR"
         ACFS_CHECKSUMS_YAML="$SCRIPT_DIR/checksums.yaml"
-        ACFS_MANIFEST_YAML="$SCRIPT_DIR/acfs.manifest.yaml"
+        ACFS_MANIFEST_YAML="$SCRIPT_DIR/wsl2-ai-autoconfig.manifest.yaml"
     else
         # Fallback: current directory
         ACFS_LIB_DIR="./scripts/lib"
         ACFS_GENERATED_DIR="./scripts/generated"
-        ACFS_ASSETS_DIR="./acfs"
+        ACFS_ASSETS_DIR="."
         ACFS_CHECKSUMS_YAML="./checksums.yaml"
-        ACFS_MANIFEST_YAML="./acfs.manifest.yaml"
+        ACFS_MANIFEST_YAML="./wsl2-ai-autoconfig.manifest.yaml"
     fi
 
     export ACFS_LIB_DIR ACFS_GENERATED_DIR ACFS_ASSETS_DIR ACFS_CHECKSUMS_YAML ACFS_MANIFEST_YAML
@@ -1064,15 +1064,15 @@ bootstrap_repo_archive() {
     if ! tar -xzf "$tmp_archive" -C "$tmp_dir" --strip-components=1 \
         --wildcards --wildcards-match-slash \
         "*/scripts/**" \
-        "*/acfs/**" \
+        "*/config/**" \
         "*/checksums.yaml" \
-        "*/acfs.manifest.yaml" \
+        "*/wsl2-ai-autoconfig.manifest.yaml" \
         "*/VERSION"; then
         log_error "Failed to extract ACFS bootstrap archive (tar error)"
         return 1
     fi
 
-    if [[ ! -f "$tmp_dir/acfs.manifest.yaml" ]] || [[ ! -f "$tmp_dir/checksums.yaml" ]] || [[ ! -f "$tmp_dir/VERSION" ]]; then
+    if [[ ! -f "$tmp_dir/wsl2-ai-autoconfig.manifest.yaml" ]] || [[ ! -f "$tmp_dir/checksums.yaml" ]] || [[ ! -f "$tmp_dir/VERSION" ]]; then
         log_error "Bootstrap archive missing required manifest/checksums/VERSION files"
         return 1
     fi
@@ -1098,7 +1098,7 @@ bootstrap_repo_archive() {
     fi
 
     local manifest_sha expected_sha
-    manifest_sha="$(acfs_calculate_file_sha256 "$tmp_dir/acfs.manifest.yaml")" || return 1
+    manifest_sha="$(acfs_calculate_file_sha256 "$tmp_dir/wsl2-ai-autoconfig.manifest.yaml")" || return 1
     expected_sha="$(grep -E '^ACFS_MANIFEST_SHA256=' "$tmp_dir/scripts/generated/manifest_index.sh" | head -n 1 | cut -d'=' -f2 | tr -d '\"' || true)"
 
     if [[ -z "$expected_sha" ]]; then
@@ -1117,9 +1117,9 @@ bootstrap_repo_archive() {
     ACFS_BOOTSTRAP_DIR="$tmp_dir"
     ACFS_LIB_DIR="$tmp_dir/scripts/lib"
     ACFS_GENERATED_DIR="$tmp_dir/scripts/generated"
-    ACFS_ASSETS_DIR="$tmp_dir/acfs"
+    ACFS_ASSETS_DIR="$tmp_dir"
     ACFS_CHECKSUMS_YAML="$tmp_dir/checksums.yaml"
-    ACFS_MANIFEST_YAML="$tmp_dir/acfs.manifest.yaml"
+    ACFS_MANIFEST_YAML="$tmp_dir/wsl2-ai-autoconfig.manifest.yaml"
 
     export ACFS_BOOTSTRAP_DIR ACFS_LIB_DIR ACFS_GENERATED_DIR ACFS_ASSETS_DIR ACFS_CHECKSUMS_YAML ACFS_MANIFEST_YAML
 
@@ -2262,13 +2262,13 @@ setup_shell() {
 
     # Copy ACFS zshrc
     log_detail "Installing ACFS zshrc"
-    try_step "Installing ACFS zshrc" install_asset "acfs/zsh/acfs.zshrc" "$ACFS_HOME/zsh/acfs.zshrc" || return 1
+    try_step "Installing ACFS zshrc" install_asset "config/zsh/wsl2aiac.zshrc" "$ACFS_HOME/zsh/acfs.zshrc" || return 1
     try_step "Setting zshrc ownership" $SUDO chown "$TARGET_USER:$TARGET_USER" "$ACFS_HOME/zsh/acfs.zshrc" || return 1
 
     # Install pre-configured Powerlevel10k theme settings
     # This prevents the p10k configuration wizard from launching on first login
     log_detail "Installing Powerlevel10k configuration"
-    try_step "Installing p10k config" install_asset "acfs/zsh/p10k.zsh" "$TARGET_HOME/.p10k.zsh" || return 1
+    try_step "Installing p10k config" install_asset "config/zsh/p10k.zsh" "$TARGET_HOME/.p10k.zsh" || return 1
     try_step "Setting p10k config ownership" $SUDO chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.p10k.zsh" || return 1
 
     # Create minimal .zshrc loader for target user (backup existing if needed)
@@ -2867,7 +2867,7 @@ finalize() {
 
     # Copy tmux config
     log_detail "Installing tmux config"
-    try_step "Installing tmux config" install_asset "acfs/tmux/tmux.conf" "$ACFS_HOME/tmux/tmux.conf" || return 1
+    try_step "Installing tmux config" install_asset "config/tmux/tmux.conf" "$ACFS_HOME/tmux/tmux.conf" || return 1
     try_step "Setting tmux config ownership" $SUDO chown "$TARGET_USER:$TARGET_USER" "$ACFS_HOME/tmux/tmux.conf" || return 1
 
     # Link to target user's tmux.conf if it doesn't exist
@@ -2883,7 +2883,7 @@ finalize() {
     
     # Install Claude hooks
     try_step "Creating ACFS claude directory" $SUDO mkdir -p "$ACFS_HOME/claude/hooks" || return 1
-    try_step "Installing git_safety_guard.py" install_asset "acfs/claude/hooks/git_safety_guard.py" "$ACFS_HOME/claude/hooks/git_safety_guard.py" || return 1
+    try_step "Installing git_safety_guard.py" install_asset "config/claude/hooks/git_safety_guard.py" "$ACFS_HOME/claude/hooks/git_safety_guard.py" || return 1
 
     # Install script libraries
     try_step "Installing logging.sh" install_asset "scripts/lib/logging.sh" "$ACFS_HOME/scripts/lib/logging.sh" || return 1
