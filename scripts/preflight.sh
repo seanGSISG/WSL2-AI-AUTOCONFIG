@@ -323,12 +323,6 @@ check_apt_lock() {
         return
     fi
 
-    # Check for unattended-upgrades
-    if pgrep -f "unattended-upgr" >/dev/null 2>&1; then
-        warn "unattended-upgrades running" "May cause apt conflicts; consider: sudo systemctl stop unattended-upgrades"
-        return
-    fi
-
     pass "APT: No locks detected"
 }
 
