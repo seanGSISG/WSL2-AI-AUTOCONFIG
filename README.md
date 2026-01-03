@@ -56,20 +56,6 @@ gemini
 ccd "Hello! Let's build something."
 ```
 
-## What's Different from ACFS
-
-| Removed | Reason |
-|---------|--------|
-| Cloud Tools (Vault, PostgreSQL, Wrangler, Supabase, Vercel) | Focus on local dev |
-| ACFS Stack Tools (NTM, MCP Agent Mail, UBS, etc.) | Reduced complexity |
-| VPS/SSH features (Tailscale, SSH key handling) | WSL2 doesn't need them |
-| Web UI | CLI-focused workflow |
-
-| Changed | From | To |
-|---------|------|-----|
-| Claude alias | `cc` | `ccd` |
-| `ls` output | Verbose (permissions, dates) | Minimal (names, icons, colors) |
-
 ## Directory Structure
 
 ```
